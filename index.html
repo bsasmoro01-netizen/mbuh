@@ -1,0 +1,2146 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Manajemen Penginapan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .fade-in {
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .scanner-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        #scanner-viewport {
+            width: 100%;
+            height: 300px;
+            position: relative;
+            overflow: hidden;
+            background: #000;
+        }
+        .modal-backdrop {
+            backdrop-filter: blur(5px);
+        }
+        .scanner-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 200px;
+            height: 200px;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
+        }
+        .scanner-overlay::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: -2px;
+            right: -2px;
+            bottom: -2px;
+            border: 2px solid #00ff00;
+            border-radius: 10px;
+            animation: scanner-pulse 2s infinite;
+        }
+        @keyframes scanner-pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        #html5-qrcode-button-camera-start {
+            background-color: #10b981 !important;
+            color: white !important;
+            padding: 8px 16px !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+        }
+        #html5-qrcode-button-camera-stop {
+            background-color: #ef4444 !important;
+            color: white !important;
+            padding: 8px 16px !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+        }
+        .checkbox-custom {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .page-link {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .page-link:hover {
+            background-color: #e5e7eb;
+        }
+        .page-link.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .location-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .location-teluk {
+            background-color: #dbeafe;
+            color: #1e40af;
+        }
+        .location-ngabul {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        .location-dungcino {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+        .duplicate-row {
+            background-color: #fef2f2 !important;
+            animation: highlight 2s ease-in-out;
+        }
+        @keyframes highlight {
+            0% { background-color: #fbbf24; }
+            100% { background-color: #fef2f2; }
+        }
+        .duplicate-badge {
+            background-color: #ef4444;
+            color: white;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        .autocomplete-suggestions {
+            position: absolute;
+            z-index: 1000;
+            background-color: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            width: 100%;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .autocomplete-suggestion {
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        .autocomplete-suggestion:hover {
+            background-color: #f3f4f6;
+        }
+        .autocomplete-suggestion.selected {
+            background-color: #dbeafe;
+        }
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Login Screen -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 to-purple-700">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md fade-in">
+            <div class="text-center mb-8">
+                <i class="fas fa-hotel text-5xl text-blue-600 mb-4"></i>
+                <h1 class="text-3xl font-bold text-gray-800">Sistem Manajemen Penginapan</h1>
+                <p class="text-gray-600 mt-2">Silakan login untuk melanjutkan</p>
+            </div>
+            
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <input type="text" id="username" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" placeholder="Masukkan username" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" id="password" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition" placeholder="Masukkan password" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition transform hover:scale-105">
+                    <i class="fas fa-sign-in-alt mr-2"></i>Login
+                </button>
+            </form>
+            
+            <div id="loginError" class="hidden mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                <i class="fas fa-exclamation-circle mr-2"></i>Username atau password salah!
+            </div>
+            
+            <!-- User Guide -->
+            <div class="mt-6 p-4 bg-blue-50 rounded-lg">
+                <h4 class="text-sm font-semibold text-blue-800 mb-2">Informasi Login:</h4>
+                <div class="text-xs text-blue-700 space-y-1">
+                    <div><strong>Admin:</strong> admin / admin123 (Akses penuh)</div>
+                    <div><strong>Teluk Awur:</strong> telukawur / teluk123</div>
+                    <div><strong>Ngabul:</strong> ngabul / ngabul123</div>
+                    <div><strong>Dungcino:</strong> dungcino / dungcino123</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="mainApp" class="hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-lg sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between items-center h-16">
+                    <div class="flex items-center">
+                        <i class="fas fa-hotel text-2xl text-blue-600 mr-3"></i>
+                        <h1 class="text-xl font-bold text-gray-800">Manajemen Penginapan</h1>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <span id="userLocation" class="text-sm text-gray-600"></span>
+                        <div id="adminUserManagement" class="hidden">
+                            <button onclick="showUserManagement()" class="text-blue-600 hover:text-blue-800 transition mr-4">
+                                <i class="fas fa-users-cog"></i> Manajemen User
+                            </button>
+                        </div>
+                        <button onclick="logout()" class="text-red-600 hover:text-red-800 transition">
+                            <i class="fas fa-sign-out-alt"></i> Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Welcome Banner -->
+            <div id="welcomeBanner" class="bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl shadow-lg p-6 mb-8 text-white">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold mb-2">Selamat Datang!</h2>
+                        <p id="welcomeText" class="text-blue-100"></p>
+                    </div>
+                    <i class="fas fa-user-circle text-6xl text-blue-200"></i>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+                <div class="bg-white rounded-xl shadow-md p-6 transform hover:scale-105 transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Total Pelanggan</p>
+                            <p id="totalCustomers" class="text-3xl font-bold text-gray-800">0</p>
+                        </div>
+                        <i class="fas fa-users text-4xl text-blue-500"></i>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-6 transform hover:scale-105 transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Hari Ini</p>
+                            <p id="todayCustomers" class="text-3xl font-bold text-gray-800">0</p>
+                        </div>
+                        <i class="fas fa-calendar-day text-4xl text-green-500"></i>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-6 transform hover:scale-105 transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Lokasi</p>
+                            <p id="locationName" class="text-xl font-bold text-gray-800">-</p>
+                        </div>
+                        <i class="fas fa-map-marker-alt text-4xl text-purple-500"></i>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl shadow-md p-6 transform hover:scale-105 transition">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-sm text-gray-600">Data Duplikat</p>
+                            <p id="duplicateCount" class="text-3xl font-bold text-red-600">0</p>
+                        </div>
+                        <i class="fas fa-exclamation-triangle text-4xl text-red-500"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Search and Filter -->
+            <div id="filterSection" class="bg-white rounded-xl shadow-md p-6 mb-8">
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cari ADM</label>
+                        <input type="text" id="searchAdm" placeholder="Masukkan kode ADM" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" oninput="filterCustomers()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cari Nama</label>
+                        <input type="text" id="searchName" placeholder="Masukkan nama pelanggan" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" oninput="filterCustomers()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Cari Alamat</label>
+                        <input type="text" id="searchAddress" placeholder="Masukkan alamat" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" oninput="filterCustomers()">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Filter Lokasi</label>
+                        <select id="filterLocation" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" onchange="filterCustomers()">
+                            <option value="">Semua Lokasi</option>
+                            <option value="Teluk Awur">Teluk Awur</option>
+                            <option value="Ngabul">Ngabul</option>
+                            <option value="Dungcino">Dungcino</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Filter Duplikat</label>
+                        <select id="filterDuplicate" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" onchange="filterCustomers()">
+                            <option value="">Semua Data</option>
+                            <option value="true">Hanya Duplikat</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+                <div class="flex flex-wrap gap-4">
+                    <button onclick="showAddModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition transform hover:scale-105">
+                        <i class="fas fa-plus mr-2"></i>Tambah Pelanggan
+                    </button>
+                    <button onclick="showScanner()" class="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 transition transform hover:scale-105">
+                        <i class="fas fa-qrcode mr-2"></i>Scan QR Code
+                    </button>
+                    <div id="adminActions" class="hidden flex gap-2">
+                        <button onclick="exportToExcel()" class="bg-yellow-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-yellow-700 transition transform hover:scale-105">
+                            <i class="fas fa-file-excel mr-2"></i>Export Excel
+                        </button>
+                        <label class="bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition transform hover:scale-105 cursor-pointer">
+                            <i class="fas fa-file-import mr-2"></i>Import Excel
+                            <input type="file" id="importFile" accept=".xlsx,.xls" class="hidden" onchange="importFromExcel(event)">
+                        </label>
+                    </div>
+                    <div id="bulkActions" class="hidden flex gap-2">
+                        <button onclick="exportSelected()" class="bg-indigo-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-indigo-700 transition transform hover:scale-105">
+                            <i class="fas fa-download mr-2"></i>Export Terpilih
+                        </button>
+                        <button onclick="deleteSelected()" class="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-red-700 transition transform hover:scale-105">
+                            <i class="fas fa-trash mr-2"></i>Hapus Terpilih
+                        </button>
+                        <button onclick="clearSelection()" class="bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-gray-700 transition transform hover:scale-105">
+                            <i class="fas fa-times mr-2"></i>Batal Pilih
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer Table -->
+            <div class="bg-white rounded-xl shadow-md overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                    <h2 class="text-xl font-semibold text-gray-800">Daftar Pelanggan</h2>
+                    <div class="flex items-center gap-4">
+                        <span class="text-sm text-gray-600">
+                            Menampilkan <span id="showingFrom">1</span> - <span id="showingTo">10</span> dari <span id="totalFiltered">0</span> data
+                        </span>
+                        <select id="pageSize" class="px-3 py-1 border border-gray-300 rounded-md text-sm" onchange="changePageSize()">
+                            <option value="10">10 per halaman</option>
+                            <option value="25">25 per halaman</option>
+                            <option value="50">50 per halaman</option>
+                            <option value="100">100 per halaman</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    <input type="checkbox" id="selectAll" class="checkbox-custom" onchange="toggleSelectAll()">
+                                </th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">No</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ADM</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nama</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alamat</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lokasi</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tanggal</th>
+                                <th id="actionHeader" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="customerTableBody" class="bg-white divide-y divide-gray-200">
+                            <!-- Data will be inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Pagination -->
+                <div class="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                    <div class="flex-1 flex justify-between sm:hidden">
+                        <button onclick="previousPage()" id="prevMobile" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Previous
+                        </button>
+                        <button onclick="nextPage()" id="nextMobile" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                            Next
+                        </button>
+                    </div>
+                    <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-sm text-gray-700">
+                                Halaman <span id="currentPageInfo" class="font-medium">1</span> dari <span id="totalPagesInfo" class="font-medium">1</span>
+                            </p>
+                        </div>
+                        <div>
+                            <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" id="pagination">
+                                <!-- Pagination buttons will be inserted here -->
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- User Management Page (Admin Only) -->
+    <div id="userManagementPage" class="hidden">
+        <div class="bg-white rounded-xl shadow-md p-6 mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Manajemen User Lokasi</h2>
+                <button onclick="backToMain()" class="text-gray-600 hover:text-gray-800 transition">
+                    <i class="fas fa-arrow-left mr-2"></i>Kembali
+                </button>
+            </div>
+            
+            <!-- Add User Button -->
+            <div class="mb-6">
+                <button onclick="showAddUserModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition transform hover:scale-105">
+                    <i class="fas fa-plus mr-2"></i>Tambah User Lokasi
+                </button>
+            </div>
+            
+            <!-- Users Table -->
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lokasi</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="userTableBody" class="bg-white divide-y divide-gray-200">
+                        <!-- User data will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div id="customerModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity modal-backdrop" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full fade-in">
+                <form id="customerForm">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4" id="modalTitle">Tambah Pelanggan Baru</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">ADM</label>
+                                <input type="text" id="customerAdm" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan kode ADM" required>
+                            </div>
+                            <div class="relative">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap</label>
+                                <input type="text" id="customerName" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan nama pelanggan" required autocomplete="off">
+                                <div id="nameSuggestions" class="autocomplete-suggestions hidden"></div>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Alamat</label>
+                                <textarea id="customerAddress" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan alamat lengkap" required></textarea>
+                            </div>
+                            <div class="relative">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Lokasi Penginapan</label>
+                                <input type="text" id="customerLocation" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan lokasi penginapan" required autocomplete="off">
+                                <div id="locationSuggestions" class="autocomplete-suggestions hidden"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            <i class="fas fa-save mr-2"></i>Simpan
+                        </button>
+                        <button type="button" onclick="closeModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            Batal
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Duplicate Warning Modal -->
+    <div id="duplicateModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity modal-backdrop" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full fade-in">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                            <i class="fas fa-exclamation-triangle text-red-600"></i>
+                        </div>
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">Peringatan Data Duplikat</h3>
+                            <div class="mt-2">
+                                <p class="text-sm text-gray-500">
+                                    Ditemukan data pelanggan dengan nama atau alamat yang sama. Berikut adalah data duplikat yang ditemukan:
+                                </p>
+                                <div id="duplicateList" class="mt-4 bg-red-50 rounded-lg p-4 max-h-60 overflow-y-auto">
+                                    <!-- Duplicate data will be inserted here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" onclick="confirmAddDuplicate()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        <i class="fas fa-check mr-2"></i>Lanjutkan Tambah
+                    </button>
+                    <button type="button" onclick="closeDuplicateModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        <i class="fas fa-times mr-2"></i>Batal
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div id="qrModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity modal-backdrop" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full fade-in">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">QR Code Pelanggan</h3>
+                    <div class="flex justify-center mb-4">
+                        <div id="qrcode"></div>
+                    </div>
+                    <p class="text-sm text-gray-600 text-center mb-4">Scan QR Code ini untuk akses cepat</p>
+                    <div class="flex justify-center space-x-4">
+                        <button onclick="downloadQR()" class="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition">
+                            <i class="fas fa-download mr-2"></i>Download
+                        </button>
+                        <button onclick="shareQR()" class="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition">
+                            <i class="fas fa-share mr-2"></i>Bagikan
+                        </button>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" onclick="closeQRModal()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-gray-600 text-base font-medium text-white hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        Tutup
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scanner Modal -->
+    <div id="scannerModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity modal-backdrop" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full fade-in">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Scan QR Code</h3>
+                    
+                    <!-- Camera Selection -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Pilih Kamera</label>
+                        <select id="cameraSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                            <option value="">Memuat kamera...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="scanner-container">
+                        <div id="reader"></div>
+                    </div>
+                    
+                    <div id="cameraError" class="hidden mt-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+                        <i class="fas fa-exclamation-triangle mr-2"></i>
+                        <span id="cameraErrorText">Tidak dapat mengakses kamera. Pastikan Anda telah memberikan izin kamera.</span>
+                    </div>
+                    
+                    <div id="scanResult" class="hidden mt-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded-lg">
+                        <i class="fas fa-check-circle mr-2"></i><span id="scanResultText"></span>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" onclick="closeScanner()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                        <i class="fas fa-times mr-2"></i>Tutup Scanner
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add/Edit User Modal -->
+    <div id="userModal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 transition-opacity modal-backdrop" aria-hidden="true">
+                <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full fade-in">
+                <form id="userForm">
+                    <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4" id="userModalTitle">Tambah User Lokasi</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                                <input type="text" id="userUsername" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan username" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                <input type="password" id="userPassword" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan password" required>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Lokasi</label>
+                                <input type="text" id="userLocation" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan lokasi" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                        <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            <i class="fas fa-save mr-2"></i>Simpan
+                        </button>
+                        <button type="button" onclick="closeUserModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                            Batal
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize users
+        function initializeUsers() {
+            if (!localStorage.getItem('appUsers')) {
+                const defaultUsers = {
+                    'admin': { password: 'admin123', role: 'admin', location: 'Admin' },
+                    'telukawur': { password: 'teluk123', role: 'location', location: 'Teluk Awur' },
+                    'ngabul': { password: 'ngabul123', role: 'location', location: 'Ngabul' },
+                    'dungcino': { password: 'dungcino123', role: 'location', location: 'Dungcino' }
+                };
+                localStorage.setItem('appUsers', JSON.stringify(defaultUsers));
+            }
+        }
+
+        function getUsers() {
+            return JSON.parse(localStorage.getItem('appUsers')) || {};
+        }
+
+        function saveUsers(users) {
+            localStorage.setItem('appUsers', JSON.stringify(users));
+        }
+
+        function addUser(username, password, role, location) {
+            const users = getUsers();
+            users[username] = { password, role, location };
+            saveUsers(users);
+        }
+
+        function updateUser(username, password, role, location) {
+            const users = getUsers();
+            if (users[username]) {
+                users[username] = { password, role, location };
+                saveUsers(users);
+            }
+        }
+
+        function deleteUser(username) {
+            const users = getUsers();
+            delete users[username];
+            saveUsers(users);
+        }
+
+        let currentUser = null;
+        let customers = JSON.parse(localStorage.getItem('customers')) || [];
+        let editingCustomerId = null;
+        let currentQRData = null;
+        let html5QrCode = null;
+        let pendingCustomerData = null;
+        
+        // Pagination variables
+        let currentPage = 1;
+        let pageSize = 10;
+        let filteredCustomers = [];
+        let selectedCustomers = new Set();
+        
+        // User management variables
+        let editingUsername = null;
+        let nameAutocompleteIndex = -1;
+        let locationAutocompleteIndex = -1;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeUsers();
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            document.getElementById('customerForm').addEventListener('submit', handleCustomerSubmit);
+            document.getElementById('userForm').addEventListener('submit', handleUserSubmit);
+            
+            // Setup autocomplete for name and location
+            setupAutocomplete('customerName', 'nameSuggestions', getNameSuggestions);
+            setupAutocomplete('customerLocation', 'locationSuggestions', getLocationSuggestions);
+            
+            updateStats();
+        });
+
+        // Setup autocomplete functionality
+        function setupAutocomplete(inputId, suggestionsId, getSuggestionsFunc) {
+            const input = document.getElementById(inputId);
+            const suggestionsContainer = document.getElementById(suggestionsId);
+            
+            input.addEventListener('input', function() {
+                const value = this.value.trim();
+                if (value.length > 0) {
+                    const suggestions = getSuggestionsFunc(value);
+                    showSuggestions(suggestions, suggestionsContainer, input);
+                } else {
+                    suggestionsContainer.classList.add('hidden');
+                }
+            });
+            
+            input.addEventListener('keydown', function(e) {
+                const items = suggestionsContainer.querySelectorAll('.autocomplete-suggestion');
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    nameAutocompleteIndex = (nameAutocompleteIndex + 1) % items.length;
+                    updateActiveSuggestion(items, nameAutocompleteIndex);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    nameAutocompleteIndex = (nameAutocompleteIndex - 1 + items.length) % items.length;
+                    updateActiveSuggestion(items, nameAutocompleteIndex);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (nameAutocompleteIndex >= 0 && items[nameAutocompleteIndex]) {
+                        input.value = items[nameAutocompleteIndex].textContent;
+                        suggestionsContainer.classList.add('hidden');
+                        nameAutocompleteIndex = -1;
+                    }
+                } else if (e.key === 'Escape') {
+                    suggestionsContainer.classList.add('hidden');
+                    nameAutocompleteIndex = -1;
+                }
+            });
+            
+            document.addEventListener('click', function(e) {
+                if (!input.contains(e.target) && !suggestionsContainer.contains(e.target)) {
+                    suggestionsContainer.classList.add('hidden');
+                    nameAutocompleteIndex = -1;
+                }
+            });
+        }
+
+        function getNameSuggestions(query) {
+            const names = [...new Set(customers.map(c => c.name.toLowerCase()))];
+            return names.filter(name => name.includes(query.toLowerCase()));
+        }
+
+        function getLocationSuggestions(query) {
+            const locations = [...new Set(customers.map(c => c.location))];
+            return locations.filter(location => location.toLowerCase().includes(query.toLowerCase()));
+        }
+
+        function showSuggestions(suggestions, container, input) {
+            container.innerHTML = '';
+            container.classList.remove('hidden');
+            
+            if (suggestions.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+            
+            suggestions.forEach(suggestion => {
+                const item = document.createElement('div');
+                item.className = 'autocomplete-suggestion';
+                item.textContent = suggestion;
+                item.addEventListener('click', function() {
+                    input.value = suggestion;
+                    container.classList.add('hidden');
+                });
+                container.appendChild(item);
+            });
+        }
+
+        function updateActiveSuggestion(items, activeIndex) {
+            items.forEach((item, index) => {
+                if (index === activeIndex) {
+                    item.classList.add('selected');
+                } else {
+                    item.classList.remove('selected');
+                }
+            });
+        }
+
+        // Login handler
+        function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value.toLowerCase();
+            const password = document.getElementById('password').value;
+            
+            const users = getUsers();
+            
+            if (users[username] && users[username].password === password) {
+                currentUser = {
+                    username: username,
+                    role: users[username].role,
+                    location: users[username].location
+                };
+                
+                document.getElementById('loginScreen').classList.add('hidden');
+                document.getElementById('mainApp').classList.remove('hidden');
+                
+                // Setup UI based on user role
+                setupUIForRole();
+                
+                document.getElementById('userLocation').textContent = currentUser.location;
+                document.getElementById('locationName').textContent = currentUser.location;
+                
+                // Set welcome text
+                const welcomeText = document.getElementById('welcomeText');
+                if (currentUser.role === 'admin') {
+                    welcomeText.textContent = 'Anda login sebagai Admin. Anda memiliki akses penuh ke semua data.';
+                } else {
+                    welcomeText.textContent = `Anda login sebagai ${currentUser.location}. Anda bisa mengakses data untuk semua lokasi.`;
+                }
+                
+                loadCustomers();
+                updateStats();
+            } else {
+                document.getElementById('loginError').classList.remove('hidden');
+                setTimeout(() => {
+                    document.getElementById('loginError').classList.add('hidden');
+                }, 3000);
+            }
+        }
+
+        // Setup UI based on user role
+        function setupUIForRole() {
+            const adminActions = document.getElementById('adminActions');
+            const filterSection = document.getElementById('filterSection');
+            const actionHeader = document.getElementById('actionHeader');
+            const selectAllHeader = document.querySelector('th input[type="checkbox"]');
+            const filterDuplicate = document.getElementById('filterDuplicate');
+            const adminUserManagement = document.getElementById('adminUserManagement');
+            const filterLocation = document.getElementById('filterLocation');
+            
+            if (currentUser.role === 'admin') {
+                // Show admin features
+                adminActions.classList.remove('hidden');
+                filterSection.classList.remove('hidden');
+                actionHeader.style.display = 'table-cell';
+                if (selectAllHeader) selectAllHeader.style.display = 'table-cell';
+                filterDuplicate.disabled = false;
+                adminUserManagement.classList.remove('hidden');
+                
+                // Set default filter location to empty (all locations)
+                filterLocation.value = '';
+                
+                // Update location filter options with all available locations
+                updateLocationFilterOptions();
+            } else {
+                // Hide admin features for location users
+                adminActions.classList.add('hidden');
+                filterSection.classList.remove('hidden');
+                actionHeader.style.display = 'none';
+                if (selectAllHeader) selectAllHeader.style.display = 'none';
+                filterDuplicate.disabled = true;
+                adminUserManagement.classList.add('hidden');
+                
+                // Enable location filter and set to user's location by default
+                filterLocation.disabled = false;
+                filterLocation.value = currentUser.location;
+            }
+        }
+
+        // Update location filter options with all available locations
+        function updateLocationFilterOptions() {
+            const filterLocation = document.getElementById('filterLocation');
+            const currentValue = filterLocation.value;
+            
+            // Get all unique locations
+            const uniqueLocations = [...new Set(customers.map(c => c.location))];
+            
+            // Clear current options except "Semua Lokasi"
+            while (filterLocation.children.length > 1) {
+                filterLocation.removeChild(filterLocation.lastChild);
+            }
+            
+            // Add all locations
+            uniqueLocations.forEach(location => {
+                const option = document.createElement('option');
+                option.value = location;
+                option.textContent = location;
+                filterLocation.appendChild(option);
+            });
+            
+            // Restore selected value if it still exists
+            if (currentValue && uniqueLocations.includes(currentValue)) {
+                filterLocation.value = currentValue;
+            } else {
+                filterLocation.value = '';
+            }
+        }
+
+        // Logout
+        function logout() {
+            currentUser = null;
+            document.getElementById('loginScreen').classList.remove('hidden');
+            document.getElementById('mainApp').classList.add('hidden');
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        // Check for duplicate customers
+        function checkDuplicateCustomer(name, address, location, excludeId = null) {
+            const duplicates = [];
+            
+            customers.forEach(customer => {
+                // Skip if checking for edit (exclude current customer)
+                if (excludeId && customer.id === excludeId) return;
+                
+                // Check location scope
+                if (currentUser.role === 'location' && customer.location !== currentUser.location) return;
+                
+                // Check for duplicates (case insensitive)
+                const nameMatch = customer.name.toLowerCase() === name.toLowerCase();
+                const addressMatch = customer.address.toLowerCase() === address.toLowerCase();
+                const locationMatch = currentUser.role === 'admin' || customer.location === location;
+                
+                if (nameMatch && addressMatch && locationMatch) {
+                    duplicates.push(customer);
+                }
+            });
+            
+            return duplicates;
+        }
+
+        // Show add modal
+        function showAddModal() {
+            editingCustomerId = null;
+            document.getElementById('modalTitle').textContent = 'Tambah Pelanggan Baru';
+            document.getElementById('customerForm').reset();
+            
+            // For location users, set and lock location
+            if (currentUser.role === 'location') {
+                document.getElementById('customerLocation').value = currentUser.location;
+                document.getElementById('customerLocation').disabled = true;
+            } else {
+                document.getElementById('customerLocation').disabled = false;
+            }
+            
+            document.getElementById('customerModal').classList.remove('hidden');
+        }
+
+        // Show edit modal (admin only)
+        function showEditModal(id) {
+            if (currentUser.role !== 'admin') {
+                alert('Anda tidak memiliki izin untuk mengedit data.');
+                return;
+            }
+            
+            const customer = customers.find(c => c.id === id);
+            if (!customer) return;
+            
+            editingCustomerId = id;
+            document.getElementById('modalTitle').textContent = 'Edit Pelanggan';
+            document.getElementById('customerAdm').value = customer.adm || '';
+            document.getElementById('customerName').value = customer.name;
+            document.getElementById('customerAddress').value = customer.address;
+            document.getElementById('customerLocation').value = customer.location;
+            document.getElementById('customerLocation').disabled = false;
+            document.getElementById('customerModal').classList.remove('hidden');
+        }
+
+        // Close modal
+        function closeModal() {
+            document.getElementById('customerModal').classList.add('hidden');
+            document.getElementById('customerForm').reset();
+            document.getElementById('nameSuggestions').classList.add('hidden');
+            document.getElementById('locationSuggestions').classList.add('hidden');
+        }
+
+        // Handle customer form submit
+        function handleCustomerSubmit(e) {
+            e.preventDefault();
+            
+            const customerData = {
+                adm: document.getElementById('customerAdm').value,
+                name: document.getElementById('customerName').value,
+                address: document.getElementById('customerAddress').value,
+                location: document.getElementById('customerLocation').value,
+                date: new Date().toISOString().split('T')[0]
+            };
+            
+            // Validate location for location users
+            if (currentUser.role === 'location' && customerData.location !== currentUser.location) {
+                alert('Anda hanya bisa menambah data untuk lokasi ' + currentUser.location);
+                return;
+            }
+            
+            // Check for duplicates
+            const duplicates = checkDuplicateCustomer(
+                customerData.name, 
+                customerData.address, 
+                customerData.location, 
+                editingCustomerId
+            );
+            
+            if (duplicates.length > 0) {
+                // Show duplicate warning modal
+                showDuplicateModal(duplicates, customerData);
+                return;
+            }
+            
+            // No duplicates, proceed with save
+            saveCustomer(customerData);
+        }
+
+        // Save customer data
+        function saveCustomer(customerData) {
+            if (editingCustomerId) {
+                // Edit existing customer (admin only)
+                if (currentUser.role !== 'admin') {
+                    alert('Anda tidak memiliki izin untuk mengedit data.');
+                    return;
+                }
+                
+                const index = customers.findIndex(c => c.id === editingCustomerId);
+                if (index !== -1) {
+                    customers[index] = { ...customers[index], ...customerData };
+                }
+            } else {
+                // Add new customer
+                customerData.id = Date.now();
+                customers.push(customerData);
+                
+                // If admin and new location added, update filter options
+                if (currentUser.role === 'admin') {
+                    updateLocationFilterOptions();
+                }
+            }
+            
+            localStorage.setItem('customers', JSON.stringify(customers));
+            filterCustomers();
+            updateStats();
+            closeModal();
+        }
+
+        // Show duplicate warning modal
+        function showDuplicateModal(duplicates, customerData) {
+            pendingCustomerData = customerData;
+            
+            const duplicateList = document.getElementById('duplicateList');
+            duplicateList.innerHTML = '';
+            
+            duplicates.forEach((duplicate, index) => {
+                const duplicateItem = document.createElement('div');
+                duplicateItem.className = 'mb-3 p-3 bg-white rounded-lg border border-red-200';
+                duplicateItem.innerHTML = `
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-semibold text-red-600">Duplikat #${index + 1}</span>
+                        <span class="text-xs text-gray-500">${duplicate.date}</span>
+                    </div>
+                    <div class="text-sm">
+                        <p><strong>ADM:</strong> ${duplicate.adm || '-'}</p>
+                        <p><strong>Nama:</strong> ${duplicate.name}</p>
+                        <p><strong>Alamat:</strong> ${duplicate.address}</p>
+                        <p><strong>Lokasi:</strong> ${duplicate.location}</p>
+                    </div>
+                `;
+                duplicateList.appendChild(duplicateItem);
+            });
+            
+            document.getElementById('duplicateModal').classList.remove('hidden');
+        }
+
+        // Close duplicate modal
+        function closeDuplicateModal() {
+            document.getElementById('duplicateModal').classList.add('hidden');
+            pendingCustomerData = null;
+        }
+
+        // Confirm add despite duplicates
+        function confirmAddDuplicate() {
+            if (pendingCustomerData) {
+                saveCustomer(pendingCustomerData);
+            }
+            closeDuplicateModal();
+        }
+
+        // Delete customer (admin only)
+        function deleteCustomer(id) {
+            if (currentUser.role !== 'admin') {
+                alert('Anda tidak memiliki izin untuk menghapus data.');
+                return;
+            }
+            
+            if (confirm('Apakah Anda yakin ingin menghapus data pelanggan ini?')) {
+                customers = customers.filter(c => c.id !== id);
+                selectedCustomers.delete(id);
+                localStorage.setItem('customers', JSON.stringify(customers));
+                filterCustomers();
+                updateStats();
+                updateBulkActions();
+            }
+        }
+
+        // Find duplicate customers for filtering
+        function findDuplicateCustomers() {
+            const duplicates = new Set();
+            
+            customers.forEach((customer1, index1) => {
+                // Check location scope
+                if (currentUser.role === 'location' && customer1.location !== currentUser.location) return;
+                
+                customers.forEach((customer2, index2) => {
+                    if (index1 >= index2) return; // Avoid checking same pair twice
+                    
+                    // Check location scope for customer2
+                    if (currentUser.role === 'location' && customer2.location !== currentUser.location) return;
+                    
+                    // Check for duplicates (case insensitive)
+                    const nameMatch = customer1.name.toLowerCase() === customer2.name.toLowerCase();
+                    const addressMatch = customer1.address.toLowerCase() === customer2.address.toLowerCase();
+                    
+                    if (nameMatch && addressMatch) {
+                        duplicates.add(customer1.id);
+                        duplicates.add(customer2.id);
+                    }
+                });
+            });
+            
+            return Array.from(duplicates);
+        }
+
+        // Filter customers
+        function filterCustomers() {
+            const searchAdm = document.getElementById('searchAdm').value.toLowerCase();
+            const searchName = document.getElementById('searchName').value.toLowerCase();
+            const searchAddress = document.getElementById('searchAddress').value.toLowerCase();
+            const filterLocation = document.getElementById('filterLocation').value;
+            const filterDuplicate = document.getElementById('filterDuplicate').value;
+            
+            filteredCustomers = customers;
+            
+            // For location users, if they select a specific location, filter by that location
+            // If they select "Semua Lokasi", then show all
+            if (currentUser.role === 'location') {
+                if (filterLocation && filterLocation !== "") {
+                    filteredCustomers = filteredCustomers.filter(c => c.location === filterLocation);
+                }
+            } else if (filterLocation) {
+                // For admin, apply location filter if selected
+                filteredCustomers = filteredCustomers.filter(c => c.location === filterLocation);
+            }
+            
+            // Apply search filters
+            if (searchAdm) {
+                filteredCustomers = filteredCustomers.filter(c => 
+                    c.adm && c.adm.toLowerCase().includes(searchAdm)
+                );
+            }
+            
+            if (searchName) {
+                filteredCustomers = filteredCustomers.filter(c => 
+                    c.name.toLowerCase().includes(searchName)
+                );
+            }
+            
+            if (searchAddress) {
+                filteredCustomers = filteredCustomers.filter(c => 
+                    c.address.toLowerCase().includes(searchAddress)
+                );
+            }
+            
+            // Apply duplicate filter
+            if (filterDuplicate === 'true') {
+                const duplicateIds = findDuplicateCustomers();
+                filteredCustomers = filteredCustomers.filter(c => duplicateIds.includes(c.id));
+            }
+            
+            // Reset to first page when filtering
+            currentPage = 1;
+            displayCustomers();
+        }
+
+        // Display customers with pagination
+        function displayCustomers() {
+            const tbody = document.getElementById('customerTableBody');
+            tbody.innerHTML = '';
+            
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
+            
+            // Update showing info
+            document.getElementById('showingFrom').textContent = filteredCustomers.length > 0 ? startIndex + 1 : 0;
+            document.getElementById('showingTo').textContent = Math.min(endIndex, filteredCustomers.length);
+            document.getElementById('totalFiltered').textContent = filteredCustomers.length;
+            
+            // Check for duplicates
+            const duplicateIds = findDuplicateCustomers();
+            
+            paginatedCustomers.forEach((customer, index) => {
+                const row = document.createElement('tr');
+                const isDuplicate = duplicateIds.includes(customer.id);
+                
+                if (isDuplicate) {
+                    row.classList.add('duplicate-row');
+                }
+                
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <input type="checkbox" class="checkbox-custom" ${selectedCustomers.has(customer.id) ? 'checked' : ''} onchange="toggleCustomerSelection(${customer.id})">
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${startIndex + index + 1}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.adm || '-'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${customer.name}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">${customer.address}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="location-badge location-${customer.location.toLowerCase().replace(' ', '')}">${customer.location}</span>
+                        ${isDuplicate ? '<span class="ml-2 duplicate-badge text-xs px-2 py-1 rounded-full">Duplikat</span>' : ''}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${customer.date}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onclick="showQRModal(${customer.id})" class="text-green-600 hover:text-green-900 mr-3">
+                            <i class="fas fa-qrcode"></i> QR
+                        </button>
+                        ${currentUser.role === 'admin' ? `
+                            <button onclick="showEditModal(${customer.id})" class="text-indigo-600 hover:text-indigo-900 mr-3">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button onclick="deleteCustomer(${customer.id})" class="text-red-600 hover:text-red-900">
+                                <i class="fas fa-trash"></i> Hapus
+                            </button>
+                        ` : ''}
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            // Update pagination
+            updatePagination();
+            updateBulkActions();
+        }
+
+        // Update pagination
+        function updatePagination() {
+            const totalPages = Math.ceil(filteredCustomers.length / pageSize);
+            document.getElementById('currentPageInfo').textContent = currentPage;
+            document.getElementById('totalPagesInfo').textContent = totalPages;
+            
+            // Update mobile buttons
+            document.getElementById('prevMobile').disabled = currentPage === 1;
+            document.getElementById('nextMobile').disabled = currentPage === totalPages || totalPages === 0;
+            
+            // Update desktop pagination
+            const pagination = document.getElementById('pagination');
+            pagination.innerHTML = '';
+            
+            // Previous button
+            const prevBtn = document.createElement('button');
+            prevBtn.className = `relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 ${currentPage === 1 ? 'cursor-not-allowed opacity-50' : ''}`;
+            prevBtn.innerHTML = '<i class="fas fa-chevron-left"></i>';
+            prevBtn.disabled = currentPage === 1;
+            prevBtn.onclick = () => previousPage();
+            pagination.appendChild(prevBtn);
+            
+            // Page numbers
+            const maxVisiblePages = 5;
+            let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+            let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+            
+            if (endPage - startPage + 1 < maxVisiblePages) {
+                startPage = Math.max(1, endPage - maxVisiblePages + 1);
+            }
+            
+            if (startPage > 1) {
+                const firstPageBtn = createPageButton(1);
+                pagination.appendChild(firstPageBtn);
+                
+                if (startPage > 2) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.className = 'relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700';
+                    ellipsis.textContent = '...';
+                    pagination.appendChild(ellipsis);
+                }
+            }
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageBtn = createPageButton(i);
+                pagination.appendChild(pageBtn);
+            }
+            
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    const ellipsis = document.createElement('span');
+                    ellipsis.className = 'relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700';
+                    ellipsis.textContent = '...';
+                    pagination.appendChild(ellipsis);
+                }
+                
+                const lastPageBtn = createPageButton(totalPages);
+                pagination.appendChild(lastPageBtn);
+            }
+            
+            // Next button
+            const nextBtn = document.createElement('button');
+            nextBtn.className = `relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 ${currentPage === totalPages || totalPages === 0 ? 'cursor-not-allowed opacity-50' : ''}`;
+            nextBtn.innerHTML = '<i class="fas fa-chevron-right"></i>';
+            nextBtn.disabled = currentPage === totalPages || totalPages === 0;
+            nextBtn.onclick = () => nextPage();
+            pagination.appendChild(nextBtn);
+        }
+
+        function createPageButton(pageNum) {
+            const btn = document.createElement('button');
+            btn.className = `relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                pageNum === currentPage 
+                    ? 'z-10 bg-blue-50 border-blue-500 text-blue-600' 
+                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+            }`;
+            btn.textContent = pageNum;
+            btn.onclick = () => goToPage(pageNum);
+            return btn;
+        }
+
+        function previousPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                displayCustomers();
+            }
+        }
+
+        function nextPage() {
+            const totalPages = Math.ceil(filteredCustomers.length / pageSize);
+            if (currentPage < totalPages) {
+                currentPage++;
+                displayCustomers();
+            }
+        }
+
+        function goToPage(page) {
+            currentPage = page;
+            displayCustomers();
+        }
+
+        function changePageSize() {
+            pageSize = parseInt(document.getElementById('pageSize').value);
+            currentPage = 1;
+            displayCustomers();
+        }
+
+        // Selection functions
+        function toggleCustomerSelection(id) {
+            if (selectedCustomers.has(id)) {
+                selectedCustomers.delete(id);
+            } else {
+                selectedCustomers.add(id);
+            }
+            updateBulkActions();
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('selectAll').checked;
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
+            
+            if (selectAll) {
+                paginatedCustomers.forEach(customer => {
+                    selectedCustomers.add(customer.id);
+                });
+            } else {
+                paginatedCustomers.forEach(customer => {
+                    selectedCustomers.delete(customer.id);
+                });
+            }
+            
+            displayCustomers();
+        }
+
+        function updateBulkActions() {
+            const bulkActions = document.getElementById('bulkActions');
+            if (selectedCustomers.size > 0) {
+                bulkActions.classList.remove('hidden');
+            } else {
+                bulkActions.classList.add('hidden');
+            }
+        }
+
+        function clearSelection() {
+            selectedCustomers.clear();
+            displayCustomers();
+        }
+
+        function exportSelected() {
+            if (selectedCustomers.size === 0) return;
+            
+            const selectedData = customers.filter(c => selectedCustomers.has(c.id));
+            exportDataToExcel(selectedData, 'pelanggan_terpilih.xlsx');
+        }
+
+        function deleteSelected() {
+            if (selectedCustomers.size === 0) return;
+            
+            if (confirm(`Apakah Anda yakin ingin menghapus ${selectedCustomers.size} data pelanggan?`)) {
+                customers = customers.filter(c => !selectedCustomers.has(c.id));
+                selectedCustomers.clear();
+                localStorage.setItem('customers', JSON.stringify(customers));
+                filterCustomers();
+                updateStats();
+            }
+        }
+
+        // QR Code functions
+        function showQRModal(id) {
+            const customer = customers.find(c => c.id === id);
+            if (!customer) return;
+            
+            currentQRData = customer;
+            document.getElementById('qrcode').innerHTML = '';
+            
+            try {
+                new QRCode(document.getElementById('qrcode'), {
+                    text: JSON.stringify(customer),
+                    width: 200,
+                    height: 200,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+            } catch (error) {
+                console.error('QR Code generation error:', error);
+                alert('Gagal generate QR Code');
+                return;
+            }
+            
+            document.getElementById('qrModal').classList.remove('hidden');
+        }
+
+        function closeQRModal() {
+            document.getElementById('qrModal').classList.add('hidden');
+            currentQRData = null;
+        }
+
+        function downloadQR() {
+            if (!currentQRData) return;
+            
+            try {
+                const canvas = document.querySelector('#qrcode canvas');
+                if (!canvas) {
+                    alert('QR Code tidak ditemukan');
+                    return;
+                }
+                
+                const link = document.createElement('a');
+                link.download = `qrcode_${currentQRData.name.replace(/\s+/g, '_')}.png`;
+                link.href = canvas.toDataURL();
+                link.click();
+            } catch (error) {
+                console.error('Download QR error:', error);
+                alert('Gagal download QR Code');
+            }
+        }
+
+        function shareQR() {
+            if (!currentQRData) return;
+            
+            if (navigator.share) {
+                try {
+                    const canvas = document.querySelector('#qrcode canvas');
+                    if (!canvas) {
+                        alert('QR Code tidak ditemukan');
+                        return;
+                    }
+                    
+                    canvas.toBlob(blob => {
+                        const file = new File([blob], `qrcode_${currentQRData.name.replace(/\s+/g, '_')}.png`, { type: 'image/png' });
+                        navigator.share({
+                            title: `QR Code untuk ${currentQRData.name}`,
+                            text: `QR Code untuk pelanggan ${currentQRData.name} di ${currentQRData.location}`,
+                            files: [file]
+                        }).catch(err => {
+                            console.log('Share cancelled or failed:', err);
+                        });
+                    });
+                } catch (error) {
+                    console.error('Share error:', error);
+                    alert('Gagal membagikan QR Code');
+                }
+            } else {
+                alert('Fitur share tidak didukung di browser ini.');
+            }
+        }
+
+        // Scanner functions
+        function showScanner() {
+            document.getElementById('scannerModal').classList.remove('hidden');
+            document.getElementById('cameraError').classList.add('hidden');
+            document.getElementById('scanResult').classList.add('hidden');
+            
+            // Load cameras
+            Html5Qrcode.getCameras().then(devices => {
+                if (devices && devices.length) {
+                    const cameraSelect = document.getElementById('cameraSelect');
+                    cameraSelect.innerHTML = '';
+                    
+                    devices.forEach(device => {
+                        const option = document.createElement('option');
+                        option.value = device.id;
+                        option.text = device.label || `Camera ${cameraSelect.length + 1}`;
+                        cameraSelect.appendChild(option);
+                    });
+                    
+                    // Start scanner with first camera
+                    startScanner(devices[0].id);
+                } else {
+                    document.getElementById('cameraError').classList.remove('hidden');
+                    document.getElementById('cameraErrorText').textContent = 'Tidak ada kamera yang ditemukan.';
+                }
+            }).catch(err => {
+                console.error('Failed to get cameras:', err);
+                document.getElementById('cameraError').classList.remove('hidden');
+                document.getElementById('cameraErrorText').textContent = 'Gagal mengakses kamera. Pastikan Anda telah memberikan izin kamera.';
+            });
+            
+            // Camera selection change
+            document.getElementById('cameraSelect').addEventListener('change', function() {
+                if (html5QrCode) {
+                    html5QrCode.stop().then(() => {
+                        startScanner(this.value);
+                    }).catch(err => {
+                        console.error('Failed to stop scanner:', err);
+                    });
+                }
+            });
+        }
+
+        function startScanner(cameraId) {
+            try {
+                html5QrCode = new Html5Qrcode("reader");
+                
+                html5QrCode.start(
+                    cameraId,
+                    {
+                        fps: 10,
+                        qrbox: { width: 250, height: 250 }
+                    },
+                    (decodedText, decodedResult) => {
+                        // Handle scan result
+                        try {
+                            const customerData = JSON.parse(decodedText);
+                            document.getElementById('scanResult').classList.remove('hidden');
+                            document.getElementById('scanResultText').textContent = `Berhasil scan: ${customerData.name} (${customerData.location})`;
+                        } catch (e) {
+                            document.getElementById('scanResult').classList.remove('hidden');
+                            document.getElementById('scanResultText').textContent = 'QR Code tidak valid untuk sistem ini.';
+                        }
+                    },
+                    (errorMessage) => {
+                        // Handle scan error silently
+                    }
+                ).catch(err => {
+                    console.error('Failed to start scanner:', err);
+                    document.getElementById('cameraError').classList.remove('hidden');
+                    document.getElementById('cameraErrorText').textContent = 'Gagal memulai scanner.';
+                });
+            } catch (error) {
+                console.error('Scanner initialization error:', error);
+                document.getElementById('cameraError').classList.remove('hidden');
+                document.getElementById('cameraErrorText').textContent = 'Gagal menginisialisasi scanner.';
+            }
+        }
+
+        function closeScanner() {
+            if (html5QrCode) {
+                html5QrCode.stop().then(() => {
+                    html5QrCode.clear();
+                    html5QrCode = null;
+                }).catch(err => {
+                    console.error('Failed to stop scanner:', err);
+                });
+            }
+            document.getElementById('scannerModal').classList.add('hidden');
+        }
+
+        // Excel functions
+        function exportToExcel() {
+            exportDataToExcel(customers, 'semua_pelanggan.xlsx');
+        }
+
+        function exportDataToExcel(data, filename) {
+            try {
+                const ws = XLSX.utils.json_to_sheet(data.map(customer => ({
+                    'ADM': customer.adm || '',
+                    'Nama': customer.name,
+                    'Alamat': customer.address,
+                    'Lokasi': customer.location,
+                    'Tanggal': customer.date
+                })));
+                
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Pelanggan');
+                XLSX.writeFile(wb, filename);
+            } catch (error) {
+                console.error('Export error:', error);
+                alert('Gagal export data ke Excel');
+            }
+        }
+
+        // Import Excel functions
+        function importFromExcel(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            // Tampilkan loading indicator
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+            loadingDiv.innerHTML = `
+                <div class="bg-white p-8 rounded-lg shadow-xl">
+                    <div class="flex items-center">
+                        <div class="loading-spinner mr-3"></div>
+                        <span class="text-lg">Memproses file Excel...</span>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(loadingDiv);
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    let data;
+                    let workbook;
+                    
+                    // Coba baca sebagai binary
+                    try {
+                        data = new Uint8Array(e.target.result);
+                        workbook = XLSX.read(data, { type: 'array' });
+                    } catch (err) {
+                        // Jika gagal, coba baca sebagai string
+                        try {
+                            const text = e.target.result;
+                            workbook = XLSX.read(text, { type: 'string' });
+                        } catch (err2) {
+                            throw new Error('Format file tidak didukung');
+                        }
+                    }
+                    
+                    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+                        throw new Error('File Excel tidak memiliki sheet');
+                    }
+                    
+                    // Ambil sheet pertama
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // Konversi ke JSON dengan berbagai opsi
+                    let jsonData;
+                    
+                    // Coba opsi 1: header: 1 (array of arrays)
+                    try {
+                        jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false });
+                    } catch (err) {
+                        // Coba opsi 2: default (object)
+                        try {
+                            jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+                            // Konversi ke format array
+                            jsonData = convertObjectToArray(jsonData);
+                        } catch (err2) {
+                            throw new Error('Gagal mengkonversi data');
+                        }
+                    }
+                    
+                    // Validasi data
+                    if (!jsonData || jsonData.length === 0) {
+                        throw new Error('File Excel kosong atau tidak ada data');
+                    }
+                    
+                    // Hapus loading indicator
+                    document.body.removeChild(loadingDiv);
+                    
+                    // Tampilkan modal untuk memilih lokasi
+                    showImportLocationModal(jsonData);
+                    
+                } catch (error) {
+                    // Hapus loading indicator
+                    if (document.body.contains(loadingDiv)) {
+                        document.body.removeChild(loadingDiv);
+                    }
+                    
+                    console.error('Import error:', error);
+                    alert(`Error: ${error.message || 'File Excel tidak valid atau format tidak sesuai.'}`);
+                }
+            };
+            
+            reader.onerror = function() {
+                // Hapus loading indicator
+                if (document.body.contains(loadingDiv)) {
+                    document.body.removeChild(loadingDiv);
+                }
+                alert('Error: Gagal membaca file');
+            };
+            
+            // Baca file sebagai ArrayBuffer
+            reader.readAsArrayBuffer(file);
+            
+            // Reset file input
+            event.target.value = '';
+        }
+
+        // Fungsi untuk konversi object ke array
+        function convertObjectToArray(data) {
+            if (!data || data.length === 0) return [];
+            
+            // Ambil keys dari object pertama sebagai header
+            const firstItem = data[0];
+            const headers = Object.keys(firstItem);
+            
+            // Buat array dengan header
+            const result = [headers];
+            
+            // Tambahkan data
+            data.forEach(item => {
+                const row = headers.map(header => item[header] || '');
+                result.push(row);
+            });
+            
+            return result;
+        }
+
+        // Perbarui fungsi showImportLocationModal
+        function showImportLocationModal(rows) {
+            // Bersihkan data kosong
+            const cleanedRows = rows.filter(row => {
+                // Skip baris yang semua kolomnya kosong
+                if (Array.isArray(row)) {
+                    return row.some(cell => cell && cell.toString().trim() !== '');
+                }
+                return false;
+            });
+            
+            if (cleanedRows.length === 0) {
+                alert('Tidak ada data yang dapat diimport dari file Excel');
+                return;
+            }
+            
+            // Buat modal secara dinamis
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 overflow-y-auto';
+            modal.innerHTML = `
+                <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                    <div class="fixed inset-0 transition-opacity modal-backdrop" aria-hidden="true">
+                        <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                    </div>
+                    <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full fade-in">
+                        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900 mb-4">Import Data dari Excel</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <p class="text-sm text-gray-600 mb-2">Ditemukan <strong>${cleanedRows.length - 1}</strong> baris data dari file Excel.</p>
+                                    <p class="text-sm text-gray-600 mb-4">Pilih lokasi untuk semua data yang akan diimport:</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Lokasi Penginapan</label>
+                                    <select id="importLocation" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" required>
+                                        <option value="">Pilih Lokasi</option>
+                                        <option value="Teluk Awur">Teluk Awur</option>
+                                        <option value="Ngabul">Ngabul</option>
+                                        <option value="Dungcino">Dungcino</option>
+                                        <option value="Lainnya">Lainnya (Input Manual)</option>
+                                    </select>
+                                </div>
+                                <div id="customLocationDiv" class="hidden">
+                                    <label class="block text-sm font-medium text-gray-700 mb-2">Nama Lokasi</label>
+                                    <input type="text" id="customLocation" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Masukkan nama lokasi">
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="skipDuplicates" class="mr-2" checked>
+                                    <label for="skipDuplicates" class="text-sm text-gray-700">Lewati data duplikat</label>
+                                </div>
+                                <div class="flex items-center">
+                                    <input type="checkbox" id="skipHeader" class="mr-2" checked>
+                                    <label for="skipHeader" class="text-sm text-gray-700">Lewati baris header</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                            <button type="button" onclick="processImportData(${JSON.stringify(cleanedRows).replace(/"/g, '&quot;')})" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                                <i class="fas fa-file-import mr-2"></i>Import Data
+                            </button>
+                            <button type="button" onclick="closeImportModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                                Batal
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Tambahkan event listener untuk perubahan lokasi
+            document.getElementById('importLocation').addEventListener('change', function() {
+                const customLocationDiv = document.getElementById('customLocationDiv');
+                if (this.value === 'Lainnya') {
+                    customLocationDiv.classList.remove('hidden');
+                } else {
+                    customLocationDiv.classList.add('hidden');
+                }
+            });
+        }
+
+        function closeImportModal() {
+            const modal = document.querySelector('.fixed.inset-0.z-50');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // Perbarui fungsi processImportData
+        function processImportData(rows) {
+            const importLocation = document.getElementById('importLocation').value;
+            const customLocation = document.getElementById('customLocation').value;
+            const skipDuplicates = document.getElementById('skipDuplicates').checked;
+            const skipHeader = document.getElementById('skipHeader').checked;
+            
+            if (!importLocation) {
+                alert('Silakan pilih lokasi terlebih dahulu!');
+                return;
+            }
+            
+            let finalLocation = importLocation;
+            if (importLocation === 'Lainnya') {
+                if (!customLocation.trim()) {
+                    alert('Silakan masukkan nama lokasi!');
+                    return;
+                }
+                finalLocation = customLocation.trim();
+            }
+            
+            // Tampilkan loading indicator
+            const loadingDiv = document.createElement('div');
+            loadingDiv.className = 'fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+            loadingDiv.innerHTML = `
+                <div class="bg-white p-8 rounded-lg shadow-xl">
+                    <div class="flex items-center">
+                        <div class="loading-spinner mr-3"></div>
+                        <span class="text-lg">Mengimport data...</span>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(loadingDiv);
+            
+            // Gunakan setTimeout untuk memastikan UI terupdate
+            setTimeout(() => {
+                try {
+                    let importedCount = 0;
+                    let duplicateCount = 0;
+                    let errorCount = 0;
+                    let newLocations = [];
+                    
+                    // Check if this is a new location
+                    if (!customers.some(c => c.location === finalLocation)) {
+                        newLocations.push(finalLocation);
+                    }
+                    
+                    // Proses data
+                    const startIndex = skipHeader ? 1 : 0;
+                    const dataToProcess = rows.slice(startIndex);
+                    
+                    dataToProcess.forEach((row, index) => {
+                        try {
+                            let adm, name, address;
+                            
+                            // Handle different row formats
+                            if (Array.isArray(row)) {
+                                // Format array: [No, ADM, NAMA, ALAMAT] atau [ADM, NAMA, ALAMAT]
+                                if (row.length >= 3) {
+                                    adm = row[0] ? row[0].toString().trim() : '';
+                                    name = row[1] ? row[1].toString().trim() : '';
+                                    address = row[2] ? row[2].toString().trim() : '';
+                                } else if (row.length === 2) {
+                                    name = row[0] ? row[0].toString().trim() : '';
+                                    address = row[1] ? row[1].toString().trim() : '';
+                                }
+                            } else if (typeof row === 'object') {
+                                // Format object
+                                adm = row.ADM || row.adm || '';
+                                name = row.NAMA || row.nama || row.Name || row.name || '';
+                                address = row.ALAMAT || row.alamat || row.Address || row.address || '';
+                            }
+                            
+                            // Validasi data
+                            if (!name || !address) {
+                                console.warn(`Baris ${startIndex + index + 1}: Data tidak lengkap (Nama atau Alamat kosong)`);
+                                errorCount++;
+                                return;
+                            }
+                            
+                            const customerData = {
+                                adm: adm,
+                                name: name,
+                                address: address,
+                                location: finalLocation,
+                                date: new Date().toISOString().split('T')[0]
+                            };
+                            
+                            // Check for duplicates
+                            const duplicates = checkDuplicateCustomer(
+                                customerData.name, 
+                                customerData.address, 
+                                customerData.location
+                            );
+                            
+                            if (duplicates.length > 0 && skipDuplicates) {
+                                duplicateCount++;
+                            } else {
+                                customerData.id = Date.now() + importedCount;
+                                customers.push(customerData);
+                                importedCount++;
+                            }
+                        } catch (error) {
+                            console.error(`Error processing row ${startIndex + index + 1}:`, error);
+                            errorCount++;
+                        }
+                    });
+                    
+                    // Save to localStorage
+                    localStorage.setItem('customers', JSON.stringify(customers));
+                    
+                    // Update filter options if new locations were added
+                    if (newLocations.length > 0 && currentUser.role === 'admin') {
+                        updateLocationFilterOptions();
+                    }
+                    
+                    // Refresh data
+                    filterCustomers();
+                    updateStats();
+                    
+                    // Close modal
+                    closeImportModal();
+                    
+                    // Hapus loading indicator
+                    document.body.removeChild(loadingDiv);
+                    
+                    // Show result
+                    let resultMessage = `Import selesai!\n\n`;
+                    resultMessage += `✅ ${importedCount} data berhasil ditambahkan.\n`;
+                    if (duplicateCount > 0) {
+                        resultMessage += `⚠️ ${duplicateCount} data duplikat dilewati.\n`;
+                    }
+                    if (errorCount > 0) {
+                        resultMessage += `❌ ${errorCount} data error (tidak lengkap).\n`;
+                    }
+                    if (newLocations.length > 0) {
+                        resultMessage += `📍 Lokasi baru ditambahkan: ${newLocations.join(', ')}\n`;
+                    }
+                    
+                    // Tampilkan hasil dalam modal yang lebih menarik
+                    showImportResultModal(resultMessage);
+                    
+                } catch (error) {
+                    console.error('Process error:', error);
+                    
+                    // Hapus loading indicator
+                    if (document.body.contains(loadingDiv)) {
+                        document.body.removeChild(loadingDiv);
+                    }
+                    
+                    alert(`Error: ${error.message || 'Gagal memproses data'}`);
+                }
+            }, 100);
+        }
+
+        // Tambahkan fungsi untuk menampilkan hasil import
+        function showImportResultModal(message) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 z-50 overflow-y-auto';
+            modal.innerHTML = `
+                <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+                    <div class="fixed inset-0 transition-opacity modal-backdrop" aria-hidden="true">
+                        <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+                    </div>
+                    <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-md sm:w-full fade-in">
+                        <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                            <div class="sm:flex sm:items-start">
+                                <div class="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                                    <i class="fas fa-check text-green-600"></i>
+                                </div>
+                                <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                                    <h3 class="text-lg leading-6 font-medium text-gray-900">Import Selesai</h3>
+                                    <div class="mt-2">
+                                        <pre class="text-sm text-gray-600 whitespace-pre-wrap">${message}</pre>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                            <button type="button" onclick="closeImportResultModal()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
+                                OK
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        function closeImportResultModal() {
+            const modal = document.querySelector('.fixed.inset-0.z-50');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        // Update stats
+        function updateStats() {
+            // Total customers
+            document.getElementById('totalCustomers').textContent = customers.length;
+            
+            // Today's customers
+            const today = new Date().toISOString().split('T')[0];
+            const todayCount = customers.filter(c => c.date === today).length;
+            document.getElementById('todayCustomers').textContent = todayCount;
+            
+            // Duplicate count
+            const duplicateIds = findDuplicateCustomers();
+            document.getElementById('duplicateCount').textContent = duplicateIds.length;
+        }
+
+        // Load customers
+        function loadCustomers() {
+            filterCustomers();
+        }
+
+        // User Management Functions
+        function showUserManagement() {
+            document.getElementById('mainApp').classList.add('hidden');
+            document.getElementById('userManagementPage').classList.remove('hidden');
+            loadUsers();
+        }
+
+        function backToMain() {
+            document.getElementById('userManagementPage').classList.add('hidden');
+            document.getElementById('mainApp').classList.remove('hidden');
+        }
+
+        function loadUsers() {
+            const users = getUsers();
+            const tbody = document.getElementById('userTableBody');
+            tbody.innerHTML = '';
+            
+            // Only show location users (not admin)
+            Object.keys(users).forEach(username => {
+                const user = users[username];
+                if (user.role === 'location') {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${username}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${user.location}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${user.role}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <button onclick="showEditUserModal('${username}')" class="text-indigo-600 hover:text-indigo-900 mr-3">
+                                <i class="fas fa-edit"></i> Edit
+                            </button>
+                            <button onclick="deleteUserConfirm('${username}')" class="text-red-600 hover:text-red-900">
+                                <i class="fas fa-trash"></i> Hapus
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            });
+        }
+
+        function showAddUserModal() {
+            editingUsername = null;
+            document.getElementById('userModalTitle').textContent = 'Tambah User Lokasi';
+            document.getElementById('userForm').reset();
+            document.getElementById('userModal').classList.remove('hidden');
+        }
+
+        function showEditUserModal(username) {
+            const users = getUsers();
+            const user = users[username];
+            if (!user || user.role !== 'location') return;
+            
+            editingUsername = username;
+            document.getElementById('userModalTitle').textContent = 'Edit User Lokasi';
+            document.getElementById('userUsername').value = username;
+            document.getElementById('userUsername').disabled = true; // Username cannot be changed
+            document.getElementById('userPassword').value = user.password;
+            document.getElementById('userLocation').value = user.location;
+            document.getElementById('userModal').classList.remove('hidden');
+        }
+
+        function closeUserModal() {
+            document.getElementById('userModal').classList.add('hidden');
+            document.getElementById('userForm').reset();
+            document.getElementById('userUsername').disabled = false;
+        }
+
+        // Handle user form submit
+        function handleUserSubmit(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('userUsername').value.toLowerCase();
+            const password = document.getElementById('userPassword').value;
+            const location = document.getElementById('userLocation').value;
+            
+            if (editingUsername) {
+                // Edit existing user
+                updateUser(username, password, 'location', location);
+            } else {
+                // Add new user
+                const users = getUsers();
+                if (users[username]) {
+                    alert('Username sudah ada!');
+                    return;
+                }
+                addUser(username, password, 'location', location);
+            }
+            
+            loadUsers();
+            closeUserModal();
+        }
+
+        function deleteUserConfirm(username) {
+            if (confirm(`Apakah Anda yakin ingin menghapus user ${username}?`)) {
+                deleteUser(username);
+                loadUsers();
+            }
+        }
+    </script>
+</body>
+</html>
